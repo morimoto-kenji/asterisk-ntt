@@ -1,0 +1,42 @@
+#! /bin/bash
+#
+# /etc/ppp/ip-up.local
+# PPPoE 接続の確立時に、取得した IP アドレスで Route53 の A レコードを更新する
+# 解説: docs/02-route53-ddns.md
+#
+# 置き換えが必要な値:
+#   NAME          … 更新するホスト名
+#   HOSTZONE_ID   … Route53 のホストゾーン ID
+#   ddns-updater  … aws CLI のプロファイル名
+
+DIR="/etc/ppp"
+JSON="$DIR/ip-up.json"
+NEW_IP=$PPP_LOCAL
+
+update_route53 () {
+cat <<EOF > $JSON
+{
+  "Comment": "Updated by /etc/ppp/ip-up.local",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "$1",
+        "Type": "A",
+        "TTL": 3600,
+        "ResourceRecords": [
+          {
+            "Value": "$NEW_IP"
+          }
+        ]
+      }
+    }
+  ]
+}
+EOF
+/usr/local/bin/aws route53 change-resource-record-sets --hosted-zone-id $2 --change-batch file://$JSON --profile ddns-updater
+}
+
+NAME="xxx.example.com"
+HOSTZONE_ID="ZXXXXXXXXXXXXX"
+update_route53 $NAME $HOSTZONE_ID
